@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>JR CC Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
@@ -286,13 +287,64 @@
     .stat-value { font-size: 18px; }
     .cc-balance-val { font-size: 15px; }
   }
+
+  /* ─── Login Screen ────────────────────────────────── */
+  #login-screen { position:fixed; inset:0; background:var(--bg); z-index:9000; display:flex; align-items:center; justify-content:center; }
+  .login-card { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:40px; width:400px; max-width:92vw; }
+  .login-header { text-align:center; margin-bottom:28px; }
+  .login-logo { font-size:36px; margin-bottom:10px; }
+  .login-title { font-size:22px; font-weight:700; color:var(--accent2); }
+  .login-sub { font-size:13px; color:var(--muted); margin-top:6px; }
+  #auth-error { font-size:12px; margin-bottom:12px; padding:8px 12px; border-radius:6px; display:none; }
+  .auth-err-msg { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--red); }
+  .auth-info-msg { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); color:var(--green); }
+  #loading-overlay { position:fixed; inset:0; background:rgba(15,17,23,0.75); z-index:8000; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .sidebar-footer { margin-top:auto; padding:16px 20px; border-top:1px solid var(--border); }
+  .user-email { font-size:11px; color:var(--muted); margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
 
+<!-- ─── Login Screen ─────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-logo">💳</div>
+      <div class="login-title">JR CC Tracker</div>
+      <div class="login-sub">Sign in to sync across all your devices</div>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="auth-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')handleAuthSubmit()" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuthSubmit()" />
+    </div>
+    <div id="auth-error"></div>
+    <button id="auth-btn" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;margin-top:4px" onclick="handleAuthSubmit()">Sign In</button>
+    <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--muted)">
+      <span id="auth-toggle-text">Don't have an account?</span>
+      <button onclick="toggleAuthMode()" id="auth-toggle-btn" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:12px;font-weight:600;margin-left:4px">Sign Up</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Loading Overlay ───────────────────────────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="color:var(--muted);font-size:13px">Loading your data…</div>
+</div>
+
+<!-- ─── App ───────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
 <!-- Mobile Top Bar -->
 <div class="mobile-topbar">
   <div class="mobile-topbar-title"><span>💳</span> JR CC Tracker</div>
+  <button class="btn btn-ghost btn-sm" onclick="signOut()" style="padding:5px 10px;font-size:11px">Sign out</button>
 </div>
 
 <!-- Mobile Bottom Nav -->
@@ -312,6 +364,10 @@
   <div class="nav-item" onclick="nav('transactions')"><span class="nav-icon">📋</span> Transactions</div>
   <div class="nav-item" onclick="nav('upload')"><span class="nav-icon">📤</span> Upload CSV</div>
   <div class="nav-item" onclick="nav('reports')"><span class="nav-icon">📈</span> Reports</div>
+  <div class="sidebar-footer">
+    <div class="user-email" id="user-email-display"></div>
+    <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center" onclick="signOut()">Sign Out</button>
+  </div>
 </nav>
 
 <!-- DASHBOARD -->
@@ -687,10 +743,129 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── Supabase Config ──────────────────────────────────────
+// ⚠️  Replace these two values with your own from supabase.com
+//     Project Settings → API → Project URL & anon/public key
+const SUPABASE_URL      = 'https://rkquhtllisbowfdsafki.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrcXVodGxsaXNib3dmZHNhZmtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxOTgzMDQsImV4cCI6MjA5Nzc3NDMwNH0.8Z3wnZqkSLWpHTGnVmMj_VyUlvec10WRGzupKqVEqM4';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 // ─── State ────────────────────────────────────────────────
-let state = JSON.parse(localStorage.getItem('cardtracker') || '{}');
-if (!state.cards) state.cards = [];
-if (!state.transactions) state.transactions = [];
+let state = { cards: [], transactions: [] };
+let currentUser = null;
+let authMode = 'signin';
+
+// ─── Auth ─────────────────────────────────────────────────
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+function showAppScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+function showLoading(b) {
+  document.getElementById('loading-overlay').style.display = b ? 'flex' : 'none';
+}
+function setAuthError(msg, type) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.className = type === 'info' ? 'auth-info-msg' : 'auth-err-msg';
+  el.style.display = msg ? 'block' : 'none';
+}
+function toggleAuthMode() {
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  const isIn = authMode === 'signin';
+  document.getElementById('auth-btn').textContent = isIn ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-toggle-text').textContent = isIn ? "Don't have an account?" : 'Already have an account?';
+  document.getElementById('auth-toggle-btn').textContent = isIn ? 'Sign Up' : 'Sign In';
+  setAuthError('');
+}
+function handleAuthSubmit() { authMode === 'signin' ? signIn() : signUp(); }
+async function signIn() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pw = document.getElementById('auth-password').value;
+  if (!email || !pw) { setAuthError('Please enter email and password'); return; }
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (error) setAuthError(error.message);
+}
+async function signUp() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pw = document.getElementById('auth-password').value;
+  if (!email || !pw) { setAuthError('Please fill all fields'); return; }
+  if (pw.length < 6) { setAuthError('Password must be at least 6 characters'); return; }
+  const btn = document.getElementById('auth-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  const { error } = await sb.auth.signUp({ email, password: pw });
+  btn.disabled = false; btn.textContent = 'Create Account';
+  if (error) setAuthError(error.message);
+  else setAuthError('Account created! Check your email to confirm, then sign in.', 'info');
+}
+async function signOut() {
+  if (!confirm('Sign out of JR CC Tracker?')) return;
+  await sb.auth.signOut();
+}
+
+// ─── Data loading ─────────────────────────────────────────
+async function loadData() {
+  showLoading(true);
+  try {
+    const [cr, tr] = await Promise.all([
+      sb.from('cards').select('*').eq('user_id', currentUser.id).order('created_at'),
+      sb.from('transactions').select('*').eq('user_id', currentUser.id).order('date', { ascending: false })
+    ]);
+    if (cr.error) throw cr.error;
+    if (tr.error) throw tr.error;
+    state.cards = (cr.data || []).map(c => ({
+      id: c.id, name: c.name, bank: c.bank || '', last4: c.last4 || '', color: c.color || '#6c63ff'
+    }));
+    state.transactions = (tr.data || []).map(t => ({
+      id: t.id, cardId: t.card_id, date: t.date, description: t.description,
+      amount: parseFloat(t.amount), category: t.category || 'Misc', notes: t.notes || ''
+    }));
+    populateCardDropdowns();
+    renderDashboard();
+    renderCards();
+  } catch(e) { toast('Load error: ' + e.message, 'error'); }
+  showLoading(false);
+}
+function subscribeRealtime() {
+  sb.channel('tracker-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cards',
+        filter: `user_id=eq.${currentUser.id}` }, () => loadData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions',
+        filter: `user_id=eq.${currentUser.id}` }, () => loadData())
+    .subscribe();
+}
+async function initApp() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    document.getElementById('user-email-display').textContent = currentUser.email;
+    showAppScreen();
+    await loadData();
+    subscribeRealtime();
+  } else {
+    showLoginScreen();
+  }
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      document.getElementById('user-email-display').textContent = currentUser.email;
+      showAppScreen();
+      await loadData();
+      subscribeRealtime();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      state = { cards: [], transactions: [] };
+      showLoginScreen();
+    }
+  });
+}
+
 
 const COLORS = ['#6c63ff','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6','#f97316','#0ea5e9'];
 const CAT_COLORS = {
@@ -711,7 +886,6 @@ let selectedCardId = null;
 let reportPeriod = 'month';
 let charts = {};
 
-function save() { localStorage.setItem('cardtracker', JSON.stringify(state)); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function fmt(n) { return '₹' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmtSigned(n) { return (n < 0 ? '-' : '') + '₹' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
@@ -902,14 +1076,18 @@ function getSelectedColor() {
   const dot = document.querySelector('.color-dot.selected');
   return dot ? dot.style.background : COLORS[0];
 }
-function saveCard() {
+async function saveCard() {
   const name = document.getElementById('cc-name').value.trim();
   const bank = document.getElementById('cc-bank').value.trim();
   const last4 = document.getElementById('cc-last4').value.trim();
   if (!name) { toast('Card name is required', 'error'); return; }
   const card = { id: uid(), name, bank, last4, color: getSelectedColor() };
+  const { error } = await sb.from('cards').insert({
+    id: card.id, user_id: currentUser.id, name: card.name,
+    bank: card.bank, last4: card.last4, color: card.color
+  });
+  if (error) { toast('Error saving card: ' + error.message, 'error'); return; }
   state.cards.push(card);
-  save();
   closeModal('modal-add-card');
   renderCards();
   populateCardDropdowns();
@@ -1002,7 +1180,7 @@ function openAddTxn() {
   document.getElementById('txn-notes').value = '';
   document.getElementById('modal-add-txn').classList.add('open');
 }
-function saveTxn() {
+async function saveTxn() {
   const date = document.getElementById('txn-date').value;
   const amount = parseFloat(document.getElementById('txn-amount').value);
   const desc = document.getElementById('txn-desc').value.trim();
@@ -1010,8 +1188,14 @@ function saveTxn() {
   const category = document.getElementById('txn-cat').value;
   const notes = document.getElementById('txn-notes').value.trim();
   if (!date || isNaN(amount) || !desc || !cardId) { toast('Please fill all required fields', 'error'); return; }
-  state.transactions.push({ id: uid(), date, amount, description: desc, cardId, category, notes });
-  save();
+  const txn = { id: uid(), date, amount, description: desc, cardId, category, notes };
+  const { error } = await sb.from('transactions').insert({
+    id: txn.id, user_id: currentUser.id, card_id: txn.cardId,
+    date: txn.date, description: txn.description, amount: txn.amount,
+    category: txn.category, notes: txn.notes
+  });
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+  state.transactions.unshift(txn);
   closeModal('modal-add-txn');
   renderTransactions();
   toast('Transaction added!');
@@ -1028,28 +1212,31 @@ function openEditTxn(id) {
   document.getElementById('edit-txn-cat').value = t.category;
   document.getElementById('modal-edit-txn').classList.add('open');
 }
-function updateTxn() {
+async function updateTxn() {
   const id = document.getElementById('edit-txn-id').value;
-  const idx = state.transactions.findIndex(t=>t.id===id);
-  if (idx<0) return;
-  state.transactions[idx] = {
-    ...state.transactions[idx],
+  const updates = {
     date: document.getElementById('edit-txn-date').value,
     amount: parseFloat(document.getElementById('edit-txn-amount').value),
     description: document.getElementById('edit-txn-desc').value.trim(),
-    cardId: document.getElementById('edit-txn-card').value,
+    card_id: document.getElementById('edit-txn-card').value,
     category: document.getElementById('edit-txn-cat').value
   };
-  save();
+  const { error } = await sb.from('transactions').update(updates).eq('id', id);
+  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+  const idx = state.transactions.findIndex(t=>t.id===id);
+  if (idx >= 0) state.transactions[idx] = { ...state.transactions[idx],
+    date: updates.date, amount: updates.amount, description: updates.description,
+    cardId: updates.card_id, category: updates.category };
   closeModal('modal-edit-txn');
   renderTransactions();
   renderCardDetail();
   toast('Transaction updated!');
 }
-function deleteTxn(id) {
+async function deleteTxn(id) {
   if (!confirm('Delete this transaction?')) return;
+  const { error } = await sb.from('transactions').delete().eq('id', id);
+  if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
   state.transactions = state.transactions.filter(t=>t.id!==id);
-  save();
   renderTransactions();
   renderCardDetail();
   renderCards();
@@ -1278,15 +1465,22 @@ function guessCat(hint) {
   if (/myntra|ajio|nykaa|purplle|mamaearth|boat |noise |mivi|samsung|oneplus|mi |realme|vivo|oppo|croma|reliance digital|vijay sales|trends|westside|pantaloons|max fashion|lifestyle|shopper|h&m|zara|uniqlo|nike|adidas|reebok|puma|skechers|salon|spa|gym|cult\.fit|crossfit|fitness|grooming|lakme|loreal|urban company|urbanclap/.test(h)) return 'Shopping & Personal';
   return 'Misc';
 }
-function importTransactions() {
+async function importTransactions() {
   if (!pendingImport.length) return;
-  state.transactions.push(...pendingImport);
-  save();
+  const rows = pendingImport.map(t => ({
+    id: t.id, user_id: currentUser.id, card_id: t.cardId,
+    date: t.date, description: t.description, amount: t.amount,
+    category: t.category, notes: ''
+  }));
+  const { error } = await sb.from('transactions').insert(rows);
+  if (error) { toast('Import failed: ' + error.message, 'error'); return; }
+  state.transactions.unshift(...pendingImport);
   pendingImport = [];
   document.getElementById('upload-preview').style.display = 'none';
   document.getElementById('csv-input').value = '';
-  toast(`Imported successfully!`);
+  toast(`Imported ${rows.length} transactions!`);
   populateCardDropdowns();
+  renderTransactions();
 }
 
 // ─── Reports ──────────────────────────────────────────────
@@ -1486,9 +1680,8 @@ function populateCardDropdowns(selectId) {
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
 
 // ─── Init ─────────────────────────────────────────────────
-populateCardDropdowns();
-renderDashboard();
-renderCards();
+initApp();
 </script>
+</div><!-- /app -->
 </body>
 </html>
