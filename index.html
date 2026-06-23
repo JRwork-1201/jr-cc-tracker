@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>JR CC Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3248;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* Sidebar */
+  .sidebar { width: 220px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0; position: fixed; top: 0; left: 0; z-index: 100; }
+  .logo { padding: 0 20px 28px; font-size: 18px; font-weight: 700; color: var(--accent2); letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+  .logo-icon { font-size: 22px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 14px; color: var(--muted); border-left: 3px solid transparent; transition: all 0.15s; }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active { color: var(--accent2); background: rgba(108,99,255,0.1); border-left-color: var(--accent); font-weight: 600; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  /* Main */
+  .main { margin-left: 220px; flex: 1; padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+
+  /* Cards grid */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 700; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat-positive { color: var(--green); }
+  .stat-negative { color: var(--red); }
+
+  /* Chart containers */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #5a52d4; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* Tables */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: var(--surface2); }
+  th { padding: 12px 16px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
+  td { padding: 12px 16px; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* Category badge */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-food { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-travel { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .badge-business { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .badge-shopping { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .badge-misc { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+  /* Credit card widget */
+  .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .cc-card { border-radius: 16px; padding: 22px; position: relative; overflow: hidden; cursor: pointer; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.15s; border: 2px solid transparent; }
+  .cc-card:hover { transform: translateY(-2px); }
+  .cc-card.selected { border-color: rgba(255,255,255,0.4); }
+  .cc-card-shine { position: absolute; top: -60px; right: -60px; width: 180px; height: 180px; background: rgba(255,255,255,0.06); border-radius: 50%; }
+  .cc-bank { font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px; }
+  .cc-name { font-size: 16px; font-weight: 700; margin-top: 4px; }
+  .cc-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+  .cc-num { font-size: 14px; letter-spacing: 2px; opacity: 0.8; font-family: monospace; }
+  .cc-balance { text-align: right; }
+  .cc-balance-label { font-size: 10px; opacity: 0.6; }
+  .cc-balance-val { font-size: 18px; font-weight: 700; }
+  .add-card-btn { border-radius: 16px; padding: 22px; min-height: 150px; border: 2px dashed var(--border); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; color: var(--muted); font-size: 13px; transition: all 0.15s; }
+  .add-card-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .add-icon { font-size: 28px; }
+
+  /* Modals */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 460px; max-width: 95vw; }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+  input, select, textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 13px; outline: none; transition: border-color 0.15s; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .color-picker-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-dot { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all 0.15s; }
+  .color-dot.selected { border-color: white; transform: scale(1.15); }
+
+  /* Upload zone */
+  .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 36px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface2); }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(108,99,255,0.06); }
+  .upload-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-text { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .upload-sub { font-size: 12px; color: var(--muted); }
+
+  /* Filters bar */
+  .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .filter-select { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; cursor: pointer; outline: none; }
+  .filter-select:focus { border-color: var(--accent); }
+  .search-input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; outline: none; min-width: 200px; }
+  .search-input:focus { border-color: var(--accent); }
+  .filter-label { font-size: 12px; color: var(--muted); }
+  .ml-auto { margin-left: auto; }
+
+  /* Reports */
+  .report-controls { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .report-controls .form-group { margin-bottom: 0; min-width: 140px; }
+  .period-tabs { display: flex; gap: 4px; background: var(--surface2); border-radius: 8px; padding: 3px; }
+  .period-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--muted); border: none; background: transparent; transition: all 0.15s; }
+  .period-tab.active { background: var(--accent); color: white; font-weight: 600; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* Amount colors */
+  .amount-positive { color: var(--red); }
+  .amount-negative { color: var(--green); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; z-index: 9999; transform: translateY(100px); opacity: 0; transition: all 0.3s; display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-left: 3px solid var(--green); }
+  .toast-error { border-left: 3px solid var(--red); }
+
+  /* Progress bars */
+  .progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+  /* Category summary rows */
+  .cat-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .cat-row:last-child { border-bottom: none; }
+  .cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .cat-name { font-size: 13px; flex: 1; }
+  .cat-amount { font-size: 13px; font-weight: 600; }
+  .cat-pct { font-size: 11px; color: var(--muted); min-width: 36px; text-align: right; }
+
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 600; }
+
+  /* Edit/delete row actions */
+  .row-actions { display: flex; gap: 6px; }
+  .icon-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 6px; font-size: 14px; transition: all 0.15s; }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* Chips */
+  .chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* ─── Mobile Top Bar ─────────────────────────────────── */
+  .mobile-topbar {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 20px; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  .mobile-topbar-title { font-size: 16px; font-weight: 700; color: var(--accent2); display: flex; align-items: center; gap: 8px; }
+
+  /* ─── Mobile Bottom Nav ──────────────────────────────── */
+  .bottom-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+    background: var(--surface); border-top: 1px solid var(--border);
+    height: 60px; flex-direction: row; align-items: stretch;
+  }
+  .bottom-nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; cursor: pointer; color: var(--muted);
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.4px; border: none; background: none; transition: color 0.15s;
+    padding: 6px 0;
+  }
+  .bottom-nav-item.active { color: var(--accent2); }
+  .bottom-nav-item .nav-icon { font-size: 20px; }
+
+  /* ─── Responsive breakpoints ─────────────────────────── */
+  @media (max-width: 768px) {
+    /* Show mobile elements */
+    .mobile-topbar { display: flex; }
+    .bottom-nav { display: flex; }
+
+    /* Hide / restyle desktop sidebar */
+    .sidebar { display: none; }
+
+    /* Main content shifts */
+    .main {
+      margin-left: 0;
+      padding: 72px 16px 76px; /* top: below topbar, bottom: above bottom nav */
+    }
+
+    /* Page title smaller */
+    .page-title { font-size: 18px; margin-bottom: 16px; }
+
+    /* Grids collapse to 1 col */
+    .grid-3 { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+    .grid-2 { grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+
+    /* Stat cards smaller */
+    .stat-value { font-size: 20px; }
+
+    /* Charts shorter on mobile */
+    .chart-wrap { height: 180px; }
+
+    /* Tables: horizontal scroll */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 500px; }
+    th, td { padding: 10px 12px; font-size: 12px; }
+
+    /* Filters wrap */
+    .filters { gap: 8px; }
+    .search-input { min-width: 100%; }
+    .filter-select { font-size: 12px; }
+
+    /* Report controls stack */
+    .report-controls { flex-direction: column; gap: 10px; }
+    .report-controls .form-group { min-width: 100%; }
+    .period-tabs { width: 100%; justify-content: stretch; }
+    .period-tab { flex: 1; text-align: center; padding: 6px 4px; font-size: 12px; }
+
+    /* CC card grid: 1 col */
+    .cc-grid { grid-template-columns: 1fr; }
+
+    /* Modal: full screen bottom sheet feel */
+    .modal {
+      width: 100% !important; max-width: 100% !important;
+      border-radius: 20px 20px 0 0; padding: 24px 20px;
+      max-height: 92vh; overflow-y: auto;
+    }
+    .modal-overlay { align-items: flex-end; }
+
+    /* Form row: single col on small screens */
+    .form-row { grid-template-columns: 1fr; }
+
+    /* Toast above bottom nav */
+    .toast { bottom: 72px; right: 16px; left: 16px; font-size: 13px; }
+
+    /* Upload zone smaller padding */
+    .upload-zone { padding: 24px 16px; }
+
+    /* Section header wraps */
+    .section-header { flex-wrap: wrap; gap: 8px; }
+
+    /* Buttons touch-friendly */
+    .btn { padding: 10px 16px; min-height: 40px; }
+    .btn-sm { padding: 8px 12px; min-height: 36px; }
+    .icon-btn { padding: 8px; font-size: 16px; }
+  }
+
+  @media (max-width: 400px) {
+    .main { padding: 68px 12px 72px; }
+    .stat-value { font-size: 18px; }
+    .cc-balance-val { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Mobile Top Bar -->
+<div class="mobile-topbar">
+  <div class="mobile-topbar-title"><span>💳</span> JR CC Tracker</div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="bottom-nav-item active" onclick="nav('dashboard')"><span class="nav-icon">📊</span>Home</button>
+  <button class="bottom-nav-item" onclick="nav('cards')"><span class="nav-icon">💳</span>Cards</button>
+  <button class="bottom-nav-item" onclick="nav('transactions')"><span class="nav-icon">📋</span>Txns</button>
+  <button class="bottom-nav-item" onclick="nav('upload')"><span class="nav-icon">📤</span>Upload</button>
+  <button class="bottom-nav-item" onclick="nav('reports')"><span class="nav-icon">📈</span>Reports</button>
+</nav>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo"><span class="logo-icon">💳</span> JR CC Tracker</div>
+  <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">📊</span> Dashboard</div>
+  <div class="nav-item" onclick="nav('cards')"><span class="nav-icon">💳</span> My Cards</div>
+  <div class="nav-item" onclick="nav('transactions')"><span class="nav-icon">📋</span> Transactions</div>
+  <div class="nav-item" onclick="nav('upload')"><span class="nav-icon">📤</span> Upload CSV</div>
+  <div class="nav-item" onclick="nav('reports')"><span class="nav-icon">📈</span> Reports</div>
+</nav>
+
+<!-- DASHBOARD -->
+<main class="main">
+<div id="page-dashboard" class="page active">
+  <div class="section-header">
+    <div class="page-title">Dashboard</div>
+    <div style="display:flex;gap:8px;">
+      <select class="filter-select" id="dash-period" onchange="renderDashboard()">
+        <option value="this_month">This Month</option>
+        <option value="last_month">Last Month</option>
+        <option value="this_quarter">This Quarter</option>
+        <option value="this_year">This Year</option>
+        <option value="all">All Time</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid-3" id="dash-stats"></div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Spending by Category</div>
+      <div class="chart-wrap"><canvas id="chart-cat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Monthly Trend</div>
+      <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="section-header" style="margin-bottom:12px"><span class="section-title">Category Breakdown</span></div>
+      <div id="dash-cat-list"></div>
+    </div>
+    <div class="chart-card">
+      <div class="section-header" style="margin-bottom:12px"><span class="section-title">Spending by Card</span></div>
+      <div class="chart-wrap" style="height:180px"><canvas id="chart-cards"></canvas></div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px">
+    <div class="section-header"><span class="section-title">Recent Transactions</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th>Amount</th></tr></thead>
+        <tbody id="dash-recent"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MY CARDS -->
+<div id="page-cards" class="page">
+  <div class="section-header">
+    <div class="page-title">My Cards</div>
+    <button class="btn btn-primary" onclick="openAddCard()">+ Add Card</button>
+  </div>
+  <div class="cc-grid" id="cards-grid"></div>
+
+  <div id="card-detail" style="display:none">
+    <div class="divider"></div>
+    <div class="section-header">
+      <span class="section-title" id="card-detail-title">Card Transactions</span>
+      <div style="display:flex;gap:8px">
+        <select class="filter-select" id="card-period" onchange="renderCardDetail()">
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="this_quarter">This Quarter</option>
+          <option value="this_year">This Year</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-3" id="card-stats"></div>
+    <div class="table-wrap" style="margin-top:0">
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="card-txn-list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSACTIONS -->
+<div id="page-transactions" class="page">
+  <div class="section-header">
+    <div class="page-title">Transactions</div>
+    <button class="btn btn-primary" onclick="openAddTxn()">+ Add Transaction</button>
+  </div>
+  <div class="filters">
+    <input class="search-input" id="txn-search" placeholder="🔍  Search transactions..." oninput="renderTransactions()" />
+    <select class="filter-select" id="txn-card-filter" onchange="renderTransactions()"><option value="">All Cards</option></select>
+    <select class="filter-select" id="txn-cat-filter" onchange="renderTransactions()">
+      <option value="">All Categories</option>
+      <option>Food & Dining</option>
+      <option>Travel & Transport</option>
+      <option>Business & Work</option>
+      <option>Shopping & Personal</option>
+      <option>Misc</option>
+    </select>
+    <select class="filter-select" id="txn-period-filter" onchange="renderTransactions()">
+      <option value="">All Time</option>
+      <option value="this_month">This Month</option>
+      <option value="last_month">Last Month</option>
+      <option value="this_quarter">This Quarter</option>
+      <option value="this_year">This Year</option>
+    </select>
+    <span class="ml-auto" style="font-size:12px;color:var(--muted)" id="txn-count"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+      <tbody id="txn-list"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="page-upload" class="page">
+  <div class="page-title">Upload CSV Statement</div>
+  <div class="chart-card" style="max-width:600px">
+    <div class="form-group">
+      <label>Select Card</label>
+      <select id="upload-card-select" class="filter-select" style="width:100%"></select>
+    </div>
+    <div class="form-group">
+      <label>CSV Format</label>
+      <select id="upload-format" class="filter-select" style="width:100%" onchange="updateFormatHint()">
+        <option value="auto">Auto-detect</option>
+        <optgroup label="Indian Banks">
+          <option value="hdfc">HDFC Credit Card</option>
+          <option value="axis">Axis Bank Credit Card</option>
+          <option value="icici">ICICI Credit Card</option>
+          <option value="sbi">SBI Credit Card</option>
+          <option value="idfc">IDFC FIRST Credit Card</option>
+          <option value="amex_india">Amex India</option>
+        </optgroup>
+        <optgroup label="Other">
+          <option value="generic">Generic (Date, Description, Amount)</option>
+        </optgroup>
+      </select>
+    </div>
+    <div id="format-hint" style="font-size:12px;color:var(--muted);margin-bottom:14px;background:var(--surface2);border-radius:8px;padding:10px 12px;display:none"></div>
+    <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleDrop(event)">
+      <div class="upload-icon">📂</div>
+      <div class="upload-text">Drop your CSV here or click to browse</div>
+      <div class="upload-sub">Supports all major bank CSV formats</div>
+    </div>
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleFileSelect(event)" />
+    <div id="upload-preview" style="margin-top:20px;display:none">
+      <div class="section-header" style="margin-bottom:10px">
+        <span class="section-title" id="preview-title">Preview</span>
+        <button class="btn btn-primary btn-sm" onclick="importTransactions()">Import All</button>
+      </div>
+      <div class="table-wrap" style="max-height:300px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th></tr></thead>
+          <tbody id="preview-list"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="preview-summary"></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="max-width:600px;margin-top:20px">
+    <div class="section-title" style="margin-bottom:14px">CSV Format Guide</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">
+      Download your statement from your bank's website as a CSV file.<br>
+      Most banks offer this under <strong style="color:var(--text)">Accounts → Activity → Download</strong>.<br><br>
+      The importer will auto-detect the format. Amounts can be positive (charges) or negative (credits/refunds).
+    </div>
+  </div>
+</div>
+
+<!-- REPORTS -->
+<div id="page-reports" class="page">
+  <div class="page-title">Reports</div>
+  <div class="report-controls">
+    <div class="form-group">
+      <label>View By</label>
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setReportPeriod('month',this)">Month</button>
+        <button class="period-tab" onclick="setReportPeriod('quarter',this)">Quarter</button>
+        <button class="period-tab" onclick="setReportPeriod('year',this)">Year</button>
+        <button class="period-tab" onclick="setReportPeriod('custom',this)">Custom</button>
+      </div>
+    </div>
+    <div class="form-group" id="rpt-month-group">
+      <label>Month</label>
+      <input type="month" id="rpt-month" class="filter-select" onchange="renderReports()" />
+    </div>
+    <div class="form-group" id="rpt-quarter-group" style="display:none">
+      <label>Quarter</label>
+      <select class="filter-select" id="rpt-quarter" onchange="renderReports()"></select>
+    </div>
+    <div class="form-group" id="rpt-year-group" style="display:none">
+      <label>Year</label>
+      <select class="filter-select" id="rpt-year" onchange="renderReports()"></select>
+    </div>
+    <div id="rpt-custom-group" style="display:none;display:flex;gap:8px">
+      <div class="form-group">
+        <label>From</label>
+        <input type="date" id="rpt-from" class="filter-select" onchange="renderReports()" />
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="date" id="rpt-to" class="filter-select" onchange="renderReports()" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Card</label>
+      <select class="filter-select" id="rpt-card" onchange="renderReports()"><option value="">All Cards</option></select>
+    </div>
+  </div>
+
+  <div class="grid-3" id="rpt-stats" style="margin-bottom:24px"></div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Spend by Category</div>
+      <div class="chart-wrap"><canvas id="rpt-chart-cat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="rpt-trend-title">Trend</div>
+      <div class="chart-wrap"><canvas id="rpt-chart-trend"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:20px">
+    <div class="chart-card">
+      <div class="section-title" style="margin-bottom:14px">Category Breakdown</div>
+      <div id="rpt-cat-list"></div>
+    </div>
+    <div class="chart-card">
+      <div class="section-title" style="margin-bottom:14px">Spend by Card</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="rpt-chart-cards"></canvas></div>
+    </div>
+  </div>
+
+  <div style="margin-top:20px">
+    <div class="section-header"><span class="section-title">All Transactions in Period</span>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th>Amount</th></tr></thead>
+        <tbody id="rpt-txn-list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- Add Card Modal -->
+<div class="modal-overlay" id="modal-add-card">
+  <div class="modal">
+    <div class="modal-title">Add Credit Card</div>
+    <div class="form-group">
+      <label>Card Name</label>
+      <input id="cc-name" placeholder="e.g. Chase Sapphire Reserve" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Bank / Issuer</label>
+        <input id="cc-bank" placeholder="e.g. Chase" />
+      </div>
+      <div class="form-group">
+        <label>Last 4 Digits</label>
+        <input id="cc-last4" placeholder="1234" maxlength="4" pattern="[0-9]{4}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Card Color</label>
+      <div class="color-picker-wrap" id="color-picker"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-card')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCard()">Save Card</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="modal-add-txn">
+  <div class="modal">
+    <div class="modal-title">Add Transaction</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="txn-date" />
+      </div>
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" id="txn-amount" placeholder="0.00" step="0.01" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input id="txn-desc" placeholder="e.g. Starbucks Coffee" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Card</label>
+        <select id="txn-card"></select>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="txn-cat">
+          <option>Food & Dining</option>
+          <option>Travel & Transport</option>
+          <option>Business & Work</option>
+          <option>Shopping & Personal</option>
+          <option>Misc</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notes (optional)</label>
+      <input id="txn-notes" placeholder="Optional note" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-txn')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTxn()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-overlay" id="modal-edit-txn">
+  <div class="modal">
+    <div class="modal-title">Edit Transaction</div>
+    <input type="hidden" id="edit-txn-id" />
+    <div class="form-row">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="edit-txn-date" />
+      </div>
+      <div class="form-group">
+        <label>Amount (₹)</label>
+        <input type="number" id="edit-txn-amount" step="0.01" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input id="edit-txn-desc" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Card</label>
+        <select id="edit-txn-card"></select>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="edit-txn-cat">
+          <option>Food & Dining</option>
+          <option>Travel & Transport</option>
+          <option>Business & Work</option>
+          <option>Shopping & Personal</option>
+          <option>Misc</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger btn-sm" onclick="deleteTxnFromEdit()" style="margin-right:auto">Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-txn')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateTxn()">Update</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────
+let state = JSON.parse(localStorage.getItem('cardtracker') || '{}');
+if (!state.cards) state.cards = [];
+if (!state.transactions) state.transactions = [];
+
+const COLORS = ['#6c63ff','#3b82f6','#22c55e','#f59e0b','#ef4444','#ec4899','#14b8a6','#8b5cf6','#f97316','#0ea5e9'];
+const CAT_COLORS = {
+  'Food & Dining': '#22c55e',
+  'Travel & Transport': '#3b82f6',
+  'Business & Work': '#8b5cf6',
+  'Shopping & Personal': '#f59e0b',
+  'Misc': '#64748b'
+};
+const CAT_CLASS = {
+  'Food & Dining': 'badge-food',
+  'Travel & Transport': 'badge-travel',
+  'Business & Work': 'badge-business',
+  'Shopping & Personal': 'badge-shopping',
+  'Misc': 'badge-misc'
+};
+let selectedCardId = null;
+let reportPeriod = 'month';
+let charts = {};
+
+function save() { localStorage.setItem('cardtracker', JSON.stringify(state)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmt(n) { return '₹' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function fmtSigned(n) { return (n < 0 ? '-' : '') + '₹' + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+// ─── Navigation ───────────────────────────────────────────
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') === `nav('${page}')`) n.classList.add('active');
+  });
+  document.querySelectorAll('.bottom-nav-item').forEach(n => {
+    if (n.getAttribute('onclick') === `nav('${page}')`) n.classList.add('active');
+  });
+  // Scroll to top on mobile nav
+  window.scrollTo(0, 0);
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'cards') renderCards();
+  if (page === 'transactions') renderTransactions();
+  if (page === 'upload') populateUploadSelect();
+  if (page === 'reports') { initReportControls(); renderReports(); }
+}
+
+// ─── Toast ────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'success' ? '✅ ' : '❌ ') + msg;
+  el.className = `toast toast-${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ─── Date helpers ─────────────────────────────────────────
+function now() { return new Date(); }
+function startOf(period, ref = new Date()) {
+  const d = new Date(ref);
+  if (period === 'month') return new Date(d.getFullYear(), d.getMonth(), 1);
+  if (period === 'last_month') return new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  if (period === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3);
+    return new Date(d.getFullYear(), q * 3, 1);
+  }
+  if (period === 'year') return new Date(d.getFullYear(), 0, 1);
+  return new Date(0);
+}
+function endOf(period, ref = new Date()) {
+  const d = new Date(ref);
+  if (period === 'month') return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  if (period === 'last_month') return new Date(d.getFullYear(), d.getMonth(), 0);
+  if (period === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3);
+    return new Date(d.getFullYear(), q * 3 + 3, 0);
+  }
+  if (period === 'year') return new Date(d.getFullYear(), 11, 31);
+  return new Date();
+}
+function inRange(dateStr, start, end) {
+  const d = new Date(dateStr);
+  return d >= start && d <= end;
+}
+function filterTxns(period, cardId = '') {
+  let txns = state.transactions;
+  if (cardId) txns = txns.filter(t => t.cardId === cardId);
+  if (period === 'all' || !period) return txns;
+  const s = startOf(period), e = endOf(period);
+  return txns.filter(t => inRange(t.date, s, e));
+}
+
+// ─── Dashboard ────────────────────────────────────────────
+let chartCat, chartTrend, chartCards;
+function renderDashboard() {
+  const period = document.getElementById('dash-period').value;
+  const txns = filterTxns(period);
+  const charges = txns.filter(t => t.amount > 0);
+  const total = charges.reduce((s, t) => s + t.amount, 0);
+
+  // Stats
+  const byCard = {};
+  state.cards.forEach(c => byCard[c.id] = 0);
+  charges.forEach(t => { if (byCard[t.cardId] !== undefined) byCard[t.cardId] += t.amount; });
+  const topCard = state.cards.sort((a,b) => (byCard[b.id]||0) - (byCard[a.id]||0))[0];
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${charges.length} transactions</div></div>
+    <div class="stat-card"><div class="stat-label">Avg per Transaction</div><div class="stat-value">${charges.length ? fmt(total/charges.length) : '$0.00'}</div><div class="stat-sub">across all cards</div></div>
+    <div class="stat-card"><div class="stat-label">Top Card</div><div class="stat-value" style="font-size:16px">${topCard ? topCard.name : '—'}</div><div class="stat-sub">${topCard ? fmt(byCard[topCard.id]) + ' spent' : 'No data'}</div></div>
+  `;
+
+  // Category donut
+  const byCat = {};
+  charges.forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
+  const cats = Object.keys(byCat);
+  destroyChart('chartCat');
+  if (cats.length) {
+    chartCat = new Chart(document.getElementById('chart-cat'), {
+      type: 'doughnut',
+      data: { labels: cats, datasets: [{ data: cats.map(c => byCat[c].toFixed(2)), backgroundColor: cats.map(c => CAT_COLORS[c] || '#64748b'), borderWidth: 0, hoverOffset: 6 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 10 } } } }
+    });
+    charts['chartCat'] = chartCat;
+  }
+
+  // Trend line (last 6 months)
+  const months = getLast6Months();
+  const monthlyTotals = months.map(m => {
+    const [yr, mo] = m.split('-').map(Number);
+    return txns.filter(t => { const d = new Date(t.date); return d.getFullYear() === yr && d.getMonth()+1 === mo && t.amount > 0; }).reduce((s,t)=>s+t.amount,0);
+  });
+  destroyChart('chartTrend');
+  chartTrend = new Chart(document.getElementById('chart-trend'), {
+    type: 'line',
+    data: { labels: months.map(m => { const [y,mo] = m.split('-'); return new Date(y,mo-1).toLocaleString('default',{month:'short'})+' '+y; }), datasets: [{ data: monthlyTotals, borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#6c63ff', pointRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#64748b', font:{size:11} }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: '#64748b', font:{size:11}, callback: v => '₹'+v.toFixed(0) }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+  });
+  charts['chartTrend'] = chartTrend;
+
+  // Cards chart
+  const cardNames = state.cards.map(c => c.name);
+  const cardTotals = state.cards.map(c => charges.filter(t=>t.cardId===c.id).reduce((s,t)=>s+t.amount,0));
+  destroyChart('chartCards');
+  if (state.cards.length) {
+    charts['chartCards'] = new Chart(document.getElementById('chart-cards'), {
+      type: 'bar',
+      data: { labels: cardNames, datasets: [{ data: cardTotals, backgroundColor: state.cards.map(c=>c.color), borderRadius: 6, borderSkipped: false }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color:'#64748b', font:{size:10} }, grid:{display:false} }, y: { ticks: { color:'#64748b', font:{size:11}, callback: v=>'$'+v.toFixed(0) }, grid:{ color:'rgba(255,255,255,0.05)' } } } }
+    });
+  }
+
+  // Cat list
+  const totalSpend = total || 1;
+  document.getElementById('dash-cat-list').innerHTML = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => `
+    <div class="cat-row">
+      <div class="cat-dot" style="background:${CAT_COLORS[cat]||'#64748b'}"></div>
+      <div class="cat-name">${cat}</div>
+      <div class="cat-amount">${fmt(amt)}</div>
+      <div class="cat-pct">${((amt/totalSpend)*100).toFixed(0)}%</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${(amt/totalSpend)*100}%;background:${CAT_COLORS[cat]||'#64748b'}"></div></div>
+  `).join('') || '<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">No data</div>';
+
+  // Recent txns
+  const recent = [...state.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+  document.getElementById('dash-recent').innerHTML = recent.map(t => {
+    const card = state.cards.find(c=>c.id===t.cardId);
+    return `<tr>
+      <td>${formatDate(t.date)}</td>
+      <td>${t.description}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${card?card.color:'#64748b'};display:inline-block"></span>${card?card.name:'Unknown'}</span></td>
+      <td><span class="badge ${CAT_CLASS[t.category]||'badge-misc'}">${t.category}</span></td>
+      <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">No transactions yet</td></tr>';
+}
+
+function getLast6Months() {
+  const months = [];
+  const d = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    months.push(`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`);
+  }
+  return months;
+}
+function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+function formatDate(str) { return new Date(str + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+
+// ─── Cards ─────────────────────────────────────────────────
+let editingCardId = null;
+function openAddCard() {
+  editingCardId = null;
+  document.getElementById('cc-name').value = '';
+  document.getElementById('cc-bank').value = '';
+  document.getElementById('cc-last4').value = '';
+  buildColorPicker();
+  document.getElementById('modal-add-card').classList.add('open');
+}
+function buildColorPicker(selected) {
+  document.getElementById('color-picker').innerHTML = COLORS.map((c,i) =>
+    `<div class="color-dot ${(!selected && i===0)||selected===c?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`
+  ).join('');
+}
+function selectColor(c, el) {
+  document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function getSelectedColor() {
+  const dot = document.querySelector('.color-dot.selected');
+  return dot ? dot.style.background : COLORS[0];
+}
+function saveCard() {
+  const name = document.getElementById('cc-name').value.trim();
+  const bank = document.getElementById('cc-bank').value.trim();
+  const last4 = document.getElementById('cc-last4').value.trim();
+  if (!name) { toast('Card name is required', 'error'); return; }
+  const card = { id: uid(), name, bank, last4, color: getSelectedColor() };
+  state.cards.push(card);
+  save();
+  closeModal('modal-add-card');
+  renderCards();
+  populateCardDropdowns();
+  toast('Card added!');
+}
+function renderCards() {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = state.cards.map(c => {
+    const spent = state.transactions.filter(t=>t.cardId===c.id&&t.amount>0).reduce((s,t)=>s+t.amount,0);
+    return `<div class="cc-card ${selectedCardId===c.id?'selected':''}" style="background:linear-gradient(135deg,${c.color},${darken(c.color)})" onclick="selectCard('${c.id}')">
+      <div class="cc-card-shine"></div>
+      <div><div class="cc-bank">${c.bank||'Card'}</div><div class="cc-name">${c.name}</div></div>
+      <div class="cc-bottom">
+        <div class="cc-num">${c.last4?'•••• '+c.last4:''}</div>
+        <div class="cc-balance"><div class="cc-balance-label">Total Spent</div><div class="cc-balance-val">${fmt(spent)}</div></div>
+      </div>
+    </div>`;
+  }).join('') + `<div class="add-card-btn" onclick="openAddCard()"><div class="add-icon">+</div><div>Add New Card</div></div>`;
+}
+function darken(hex) {
+  try {
+    const r = parseInt(hex.slice(1,3)||'00',16), g = parseInt(hex.slice(3,5)||'00',16), b = parseInt(hex.slice(5,7)||'00',16);
+    return `rgb(${Math.max(0,r-40)},${Math.max(0,g-40)},${Math.max(0,b-40)})`;
+  } catch(e) { return hex; }
+}
+function selectCard(id) {
+  selectedCardId = id;
+  renderCards();
+  renderCardDetail();
+  document.getElementById('card-detail').style.display = 'block';
+}
+function renderCardDetail() {
+  if (!selectedCardId) return;
+  const card = state.cards.find(c=>c.id===selectedCardId);
+  if (!card) return;
+  const period = document.getElementById('card-period').value;
+  const txns = filterTxns(period, selectedCardId);
+  const charges = txns.filter(t=>t.amount>0);
+  const total = charges.reduce((s,t)=>s+t.amount,0);
+  const credits = txns.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+  document.getElementById('card-detail-title').textContent = card.name + ' — Transactions';
+  document.getElementById('card-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Charges</div><div class="stat-value">${fmt(total)}</div></div>
+    <div class="stat-card"><div class="stat-label">Credits / Refunds</div><div class="stat-value" style="color:var(--green)">${fmt(credits)}</div></div>
+    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value">${txns.length}</div></div>
+  `;
+  const sorted = [...txns].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  document.getElementById('card-txn-list').innerHTML = sorted.map(t => `<tr>
+    <td>${formatDate(t.date)}</td>
+    <td>${t.description}</td>
+    <td><span class="badge ${CAT_CLASS[t.category]||'badge-misc'}">${t.category}</span></td>
+    <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
+    <td><div class="row-actions"><button class="icon-btn" onclick="openEditTxn('${t.id}')">✏️</button><button class="icon-btn" onclick="deleteTxn('${t.id}')">🗑️</button></div></td>
+  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">No transactions</td></tr>';
+}
+
+// ─── Transactions ──────────────────────────────────────────
+function renderTransactions() {
+  const search = document.getElementById('txn-search').value.toLowerCase();
+  const cardF = document.getElementById('txn-card-filter').value;
+  const catF = document.getElementById('txn-cat-filter').value;
+  const period = document.getElementById('txn-period-filter').value;
+  let txns = state.transactions;
+  if (cardF) txns = txns.filter(t=>t.cardId===cardF);
+  if (catF) txns = txns.filter(t=>t.category===catF);
+  if (period) {
+    const s = startOf(period), e = endOf(period);
+    txns = txns.filter(t=>inRange(t.date,s,e));
+  }
+  if (search) txns = txns.filter(t=>t.description.toLowerCase().includes(search));
+  txns = [...txns].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  document.getElementById('txn-count').textContent = txns.length + ' transactions';
+  document.getElementById('txn-list').innerHTML = txns.map(t => {
+    const card = state.cards.find(c=>c.id===t.cardId);
+    return `<tr>
+      <td>${formatDate(t.date)}</td>
+      <td>${t.description}${t.notes?`<span style="color:var(--muted);font-size:11px;margin-left:6px">${t.notes}</span>`:''}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${card?card.color:'#64748b'};display:inline-block"></span>${card?card.name:'Unknown'}</span></td>
+      <td><span class="badge ${CAT_CLASS[t.category]||'badge-misc'}">${t.category}</span></td>
+      <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
+      <td><div class="row-actions"><button class="icon-btn" onclick="openEditTxn('${t.id}')">✏️</button><button class="icon-btn" onclick="deleteTxn('${t.id}')">🗑️</button></div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">No transactions found</td></tr>';
+}
+function openAddTxn() {
+  populateCardDropdowns();
+  document.getElementById('txn-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('txn-amount').value = '';
+  document.getElementById('txn-desc').value = '';
+  document.getElementById('txn-notes').value = '';
+  document.getElementById('modal-add-txn').classList.add('open');
+}
+function saveTxn() {
+  const date = document.getElementById('txn-date').value;
+  const amount = parseFloat(document.getElementById('txn-amount').value);
+  const desc = document.getElementById('txn-desc').value.trim();
+  const cardId = document.getElementById('txn-card').value;
+  const category = document.getElementById('txn-cat').value;
+  const notes = document.getElementById('txn-notes').value.trim();
+  if (!date || isNaN(amount) || !desc || !cardId) { toast('Please fill all required fields', 'error'); return; }
+  state.transactions.push({ id: uid(), date, amount, description: desc, cardId, category, notes });
+  save();
+  closeModal('modal-add-txn');
+  renderTransactions();
+  toast('Transaction added!');
+}
+function openEditTxn(id) {
+  const t = state.transactions.find(x=>x.id===id);
+  if (!t) return;
+  populateCardDropdowns('edit-txn-card');
+  document.getElementById('edit-txn-id').value = t.id;
+  document.getElementById('edit-txn-date').value = t.date;
+  document.getElementById('edit-txn-amount').value = t.amount;
+  document.getElementById('edit-txn-desc').value = t.description;
+  document.getElementById('edit-txn-card').value = t.cardId;
+  document.getElementById('edit-txn-cat').value = t.category;
+  document.getElementById('modal-edit-txn').classList.add('open');
+}
+function updateTxn() {
+  const id = document.getElementById('edit-txn-id').value;
+  const idx = state.transactions.findIndex(t=>t.id===id);
+  if (idx<0) return;
+  state.transactions[idx] = {
+    ...state.transactions[idx],
+    date: document.getElementById('edit-txn-date').value,
+    amount: parseFloat(document.getElementById('edit-txn-amount').value),
+    description: document.getElementById('edit-txn-desc').value.trim(),
+    cardId: document.getElementById('edit-txn-card').value,
+    category: document.getElementById('edit-txn-cat').value
+  };
+  save();
+  closeModal('modal-edit-txn');
+  renderTransactions();
+  renderCardDetail();
+  toast('Transaction updated!');
+}
+function deleteTxn(id) {
+  if (!confirm('Delete this transaction?')) return;
+  state.transactions = state.transactions.filter(t=>t.id!==id);
+  save();
+  renderTransactions();
+  renderCardDetail();
+  renderCards();
+  toast('Deleted');
+}
+function deleteTxnFromEdit() {
+  const id = document.getElementById('edit-txn-id').value;
+  closeModal('modal-edit-txn');
+  deleteTxn(id);
+}
+
+// ─── CSV Upload ───────────────────────────────────────────
+let pendingImport = [];
+function updateFormatHint() {
+  const hints = {
+    hdfc:      '📥 HDFC NetBanking → Credit Cards → View Statement → Download. Columns: Date, Narration, Amount, Dr/Cr',
+    axis:      '📥 Axis Mobile/NetBanking → Cards → Statement → Download CSV. Columns: Date, Transaction Details, Amount (INR), Dr/Cr',
+    icici:     '📥 iMobile/NetBanking → Credit Cards → Statement → Download. Columns: Date, Sr No, Transaction Details, Reward Points, Intl.Amount, Amount',
+    sbi:       '📥 YONO SBI → Cards → Statement → Download CSV. Columns: Txn Date, Transaction Details, Amount, Dr/Cr',
+    idfc:      '📥 IDFC FIRST App → Credit Card → Statements → Download. Columns: Transaction Date, Transaction Description, Amount (INR), Debit/Credit',
+    amex_india:'📥 AmexIndia.com → Account Activity → Download CSV. Columns: Date, Description, Amount',
+    generic:   'Auto-map by header name: needs Date, Description, Amount columns (any order)'
+  };
+  const h = document.getElementById('format-hint');
+  const v = document.getElementById('upload-format').value;
+  if (hints[v]) { h.textContent = '📋 ' + hints[v]; h.style.display = 'block'; }
+  else h.style.display = 'none';
+}
+function populateUploadSelect() {
+  const sel = document.getElementById('upload-card-select');
+  sel.innerHTML = state.cards.map(c=>`<option value="${c.id}">${c.name}${c.last4?' (••'+c.last4+')':''}</option>`).join('');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processCSV(file);
+}
+function handleFileSelect(e) { const f = e.target.files[0]; if (f) processCSV(f); }
+function processCSV(file) {
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file);
+}
+function parseCSV(text) {
+  const format = document.getElementById('upload-format').value;
+  // Strip BOM if present (common in Indian bank exports)
+  const clean = text.replace(/^﻿/, '');
+  const allLines = clean.split('\n').map(l=>l.trim()).filter(l=>l);
+
+  // Find the actual header row (skip bank-added preamble lines)
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(allLines.length, 10); i++) {
+    const lower = allLines[i].toLowerCase();
+    if (lower.includes('date') && (lower.includes('amount') || lower.includes('narration') || lower.includes('description') || lower.includes('transaction'))) {
+      headerIdx = i; break;
+    }
+  }
+  const lines = allLines.slice(headerIdx);
+  const header = lines[0].toLowerCase().split(',').map(h=>h.trim().replace(/"/g,''));
+
+  function splitRow(l) {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of l) {
+      if (ch==='"') inQ=!inQ;
+      else if (ch===','&&!inQ) { cols.push(cur.trim()); cur=''; }
+      else cur+=ch;
+    }
+    cols.push(cur.trim());
+    return cols;
+  }
+  const rows = lines.slice(1).map(splitRow).filter(r=>r.length>1);
+
+  pendingImport = [];
+  for (const row of rows) {
+    let date='', desc='', amount=0, cat='Misc';
+    const get = idx => (row[idx]||'').replace(/"/g,'').trim();
+    const cleanAmt = s => parseFloat(s.replace(/[₹$,\s]/g,'').replace(/[()]/g,'-') || '0');
+    const drCrSign = (s) => /^cr$/i.test(s.trim()) ? -1 : 1; // Cr = credit/refund = negative
+
+    if (format === 'hdfc') {
+      // HDFC CC: Date, Narration, Amount, Dr/Cr
+      // Also handles: Sr.No, Transaction Date, Transaction Details, Reward Points, Intl.Amount, Amount(INR)
+      if (header.length >= 6 && (header.includes('reward point') || header.some(h=>h.includes('intl')))) {
+        // Long HDFC format
+        date = normalizeDate(get(1)); desc = get(2);
+        amount = cleanAmt(get(5)) * drCrSign('dr'); // always charges in this format
+      } else {
+        // Short HDFC format: Date, Narration, Amount, Dr/Cr
+        date = normalizeDate(get(0)); desc = get(1);
+        amount = cleanAmt(get(2)) * drCrSign(get(3));
+      }
+      cat = guessCat(desc);
+
+    } else if (format === 'axis') {
+      // Axis CC: Date, Transaction Details, Amount (INR), Dr/Cr
+      date = normalizeDate(get(0)); desc = get(1);
+      amount = cleanAmt(get(2)) * drCrSign(get(3));
+      cat = guessCat(desc);
+
+    } else if (format === 'icici') {
+      // ICICI CC: Date, Sr No, Transaction Details, Reward Points, Intl.Amount, Amount(INR)
+      // Or savings: Transaction Date, Value Date, Description, Ref No, Debit, Credit, Balance
+      if (header.some(h=>h.includes('reward') || h.includes('intl'))) {
+        // Credit card format
+        date = normalizeDate(get(0)); desc = get(2);
+        const raw = get(5) || get(4);
+        // ICICI shows Cr suffix for credits in some exports
+        const isCr = /cr$/i.test(raw);
+        amount = cleanAmt(raw) * (isCr ? -1 : 1);
+      } else {
+        // Savings account format with Debit/Credit columns
+        date = normalizeDate(get(0)); desc = get(2);
+        const debit = cleanAmt(get(4)), credit = cleanAmt(get(5));
+        amount = debit > 0 ? debit : -credit;
+      }
+      cat = guessCat(desc);
+
+    } else if (format === 'sbi') {
+      // SBI CC: Txn Date, Transaction Details, Amount, Dr/Cr
+      date = normalizeDate(get(0)); desc = get(1);
+      amount = cleanAmt(get(2)) * drCrSign(get(3));
+      cat = guessCat(desc);
+
+    } else if (format === 'idfc') {
+      // IDFC FIRST CC: Transaction Date, Transaction Description, Amount (INR), Debit/Credit
+      date = normalizeDate(get(0)); desc = get(1);
+      amount = cleanAmt(get(2)) * drCrSign(get(3));
+      cat = guessCat(desc);
+
+    } else if (format === 'amex_india') {
+      // Amex India: Date, Description, Amount  (charges positive, credits negative)
+      date = normalizeDate(get(0)); desc = get(1);
+      amount = cleanAmt(get(2));
+      cat = guessCat(desc);
+
+    } else {
+      // Generic auto-detect — scan headers
+      const di  = header.findIndex(h=>h.includes('date'));
+      const ami = header.findIndex(h=>h.includes('amount')||h.includes('withdrawal')||h.includes('debit'));
+      const cri = header.findIndex(h=>h.includes('credit') || h.includes('deposit'));
+      const desi= header.findIndex(h=>h.includes('desc')||h.includes('narration')||h.includes('particular')||h.includes('detail')||h.includes('payee')||h.includes('merchant'));
+      const dri = header.findIndex(h=>h==='dr/cr'||h==='debit/credit'||h==='type');
+      date = normalizeDate(get(di>=0?di:0));
+      desc = get(desi>=0?desi:1);
+      if (ami>=0 && cri>=0) {
+        // Separate debit/credit columns
+        const d = cleanAmt(get(ami)), c = cleanAmt(get(cri));
+        amount = d > 0 ? d : -c;
+      } else {
+        amount = cleanAmt(get(ami>=0?ami:2));
+        if (dri>=0) amount *= drCrSign(get(dri));
+      }
+      cat = guessCat(desc);
+    }
+
+    if (date && desc && !isNaN(amount) && amount !== 0) {
+      pendingImport.push({ id:uid(), date, description:desc, amount, category:cat, cardId: document.getElementById('upload-card-select').value });
+    }
+  }
+
+  document.getElementById('upload-preview').style.display = 'block';
+  document.getElementById('preview-title').textContent = `Preview (${pendingImport.length} transactions)`;
+  document.getElementById('preview-list').innerHTML = pendingImport.map(t=>`<tr>
+    <td>${formatDate(t.date)}</td><td>${t.description}</td>
+    <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
+    <td><span class="badge ${CAT_CLASS[t.category]||'badge-misc'}">${t.category}</span></td>
+  </tr>`).join('');
+  const total = pendingImport.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  document.getElementById('preview-summary').textContent = `${pendingImport.length} transactions · Total charges: ${fmt(total)}`;
+}
+function normalizeDate(str) {
+  if (!str) return '';
+  str = str.replace(/"/g,'').trim();
+  const MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+
+  // YYYY-MM-DD (ISO)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // DD/MM/YYYY — Indian standard (day ≤ 31, month ≤ 12)
+  const dmy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const [,d,m,y] = dmy;
+    if (parseInt(m) <= 12) return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  // DD-MM-YYYY or DD-MM-YY
+  const dmyDash = str.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+  if (dmyDash) {
+    const [,d,m,y] = dmyDash;
+    if (parseInt(m) <= 12) {
+      const yr = y.length === 2 ? '20'+y : y;
+      return `${yr}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+  }
+
+  // DD-MMM-YYYY or DD-MMM-YY (e.g. 15-Jun-2024 or 15-Jun-24) — Axis, some ICICI
+  const dMonY = str.match(/^(\d{1,2})[- ]([A-Za-z]{3})[- ](\d{2,4})$/);
+  if (dMonY) {
+    const [,d,mon,y] = dMonY;
+    const m = MONTHS[mon.toLowerCase()];
+    if (m) {
+      const yr = y.length === 2 ? '20'+y : y;
+      return `${yr}-${String(m).padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+  }
+
+  // DD/MM/YY
+  const dmyShort = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (dmyShort) {
+    const [,d,m,y] = dmyShort;
+    if (parseInt(m) <= 12) return `20${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+
+  return '';
+}
+function guessCat(hint) {
+  const h = (hint||'').toLowerCase();
+  // Food & Dining — Indian + international
+  if (/zomato|swiggy|blinkit|zepto|bigbasket|dunzo|dineout|eazydiner|freshmenu|box8|faasos|licious|country delight|milkbasket|restaurant|cafe|coffee|dhaba|biryani|pizza|burger|sushi|mcdonald|kfc|subway|domino|haldiram|barbeque|wow momo|starbucks|chaayos|third wave|barista|ccd|costa|food|dining|grocery|supermarket|more retail|reliance fresh|d-mart|dmart|spencer|nature basket/.test(h)) return 'Food & Dining';
+  // Travel & Transport — Indian + international
+  if (/indigo|air india|spicejet|vistara|akasa|goair|air asia|makemytrip|goibibo|yatra|cleartrip|ixigo|irctc|redbus|abhibus|oyo|treebo|fabhotel|mmt|hotel|airlines|airport|metro|rapido|ola|uber|cab|taxi|parking|fuel|petrol|pump|hp petrol|iocl|bpcl|bharat petroleum|hpcl|nozama|flight|train|bus/.test(h)) return 'Travel & Transport';
+  // Business & Work — Indian + international
+  if (/flipkart|amazon|meesho|shopsy|snapdeal|paytm mall|jio|airtel|vodafone|vi |bsnl|microsoft|google|apple|adobe|zoom|slack|notion|aws|azure|gcp|godaddy|hostinger|tally|razorpay|cashfree|instamojo|office|software|subscription|saas|domain|hosting|courier|bluedart|dtdc|delhivery|ecom express/.test(h)) return 'Business & Work';
+  // Shopping & Personal — Indian + international
+  if (/myntra|ajio|nykaa|purplle|mamaearth|boat |noise |mivi|samsung|oneplus|mi |realme|vivo|oppo|croma|reliance digital|vijay sales|trends|westside|pantaloons|max fashion|lifestyle|shopper|h&m|zara|uniqlo|nike|adidas|reebok|puma|skechers|salon|spa|gym|cult\.fit|crossfit|fitness|grooming|lakme|loreal|urban company|urbanclap/.test(h)) return 'Shopping & Personal';
+  return 'Misc';
+}
+function importTransactions() {
+  if (!pendingImport.length) return;
+  state.transactions.push(...pendingImport);
+  save();
+  pendingImport = [];
+  document.getElementById('upload-preview').style.display = 'none';
+  document.getElementById('csv-input').value = '';
+  toast(`Imported successfully!`);
+  populateCardDropdowns();
+}
+
+// ─── Reports ──────────────────────────────────────────────
+function initReportControls() {
+  // Month
+  const today = new Date();
+  document.getElementById('rpt-month').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+
+  // Quarter options
+  const qSel = document.getElementById('rpt-quarter');
+  qSel.innerHTML = '';
+  for (let y = today.getFullYear(); y >= today.getFullYear()-2; y--) {
+    for (let q = 4; q >= 1; q--) {
+      if (y===today.getFullYear() && q > Math.ceil((today.getMonth()+1)/3)) continue;
+      qSel.innerHTML += `<option value="${y}-Q${q}">${y} Q${q}</option>`;
+    }
+  }
+
+  // Year
+  const ySel = document.getElementById('rpt-year');
+  ySel.innerHTML = '';
+  for (let y = today.getFullYear(); y >= today.getFullYear()-4; y--) {
+    ySel.innerHTML += `<option value="${y}">${y}</option>`;
+  }
+
+  // Card
+  const rptCard = document.getElementById('rpt-card');
+  rptCard.innerHTML = '<option value="">All Cards</option>' + state.cards.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+}
+function setReportPeriod(p, el) {
+  reportPeriod = p;
+  document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('rpt-month-group').style.display = p==='month'?'block':'none';
+  document.getElementById('rpt-quarter-group').style.display = p==='quarter'?'block':'none';
+  document.getElementById('rpt-year-group').style.display = p==='year'?'block':'none';
+  document.getElementById('rpt-custom-group').style.display = p==='custom'?'flex':'none';
+  renderReports();
+}
+function getReportRange() {
+  if (reportPeriod === 'month') {
+    const [y,m] = document.getElementById('rpt-month').value.split('-').map(Number);
+    return { start: new Date(y,m-1,1), end: new Date(y,m,0), label: new Date(y,m-1).toLocaleString('default',{month:'long',year:'numeric'}) };
+  }
+  if (reportPeriod === 'quarter') {
+    const val = document.getElementById('rpt-quarter').value || '2024-Q1';
+    const [y,q] = val.split('-Q').map(Number);
+    return { start: new Date(y,(q-1)*3,1), end: new Date(y,q*3,0), label: `${y} Q${q}` };
+  }
+  if (reportPeriod === 'year') {
+    const y = parseInt(document.getElementById('rpt-year').value);
+    return { start: new Date(y,0,1), end: new Date(y,11,31), label: String(y) };
+  }
+  if (reportPeriod === 'custom') {
+    const from = document.getElementById('rpt-from').value;
+    const to = document.getElementById('rpt-to').value;
+    if (from && to) return { start: new Date(from), end: new Date(to), label: `${from} – ${to}` };
+  }
+  return { start: new Date(0), end: new Date(), label: 'All Time' };
+}
+function renderReports() {
+  const { start, end, label } = getReportRange();
+  const cardF = document.getElementById('rpt-card') ? document.getElementById('rpt-card').value : '';
+  let txns = state.transactions.filter(t => inRange(t.date, start, end));
+  if (cardF) txns = txns.filter(t=>t.cardId===cardF);
+  const charges = txns.filter(t=>t.amount>0);
+  const total = charges.reduce((s,t)=>s+t.amount,0);
+  const credits = txns.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+
+  document.getElementById('rpt-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${label}</div></div>
+    <div class="stat-card"><div class="stat-label">Credits / Refunds</div><div class="stat-value" style="color:var(--green)">${fmt(credits)}</div><div class="stat-sub">${txns.filter(t=>t.amount<0).length} credits</div></div>
+    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value">${charges.length}</div><div class="stat-sub">avg ${charges.length?fmt(total/charges.length):'$0'}/txn</div></div>
+  `;
+
+  // Category chart
+  const byCat = {};
+  charges.forEach(t => { byCat[t.category] = (byCat[t.category]||0) + t.amount; });
+  const cats = Object.keys(byCat);
+  destroyChart('rptChartCat');
+  if (cats.length) {
+    charts['rptChartCat'] = new Chart(document.getElementById('rpt-chart-cat'), {
+      type: 'doughnut',
+      data: { labels: cats, datasets: [{ data: cats.map(c=>byCat[c].toFixed(2)), backgroundColor: cats.map(c=>CAT_COLORS[c]||'#64748b'), borderWidth: 0, hoverOffset:6 }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:'#94a3b8', font:{size:11}, boxWidth:12, padding:10 } } } }
+    });
+  }
+
+  // Trend within period
+  const trendData = buildTrendData(txns, start, end);
+  document.getElementById('rpt-trend-title').textContent = 'Spend Trend — ' + label;
+  destroyChart('rptChartTrend');
+  charts['rptChartTrend'] = new Chart(document.getElementById('rpt-chart-trend'), {
+    type: 'bar',
+    data: { labels: trendData.labels, datasets: [{ data: trendData.values, backgroundColor: 'rgba(108,99,255,0.7)', borderRadius:4, borderSkipped:false }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
+  });
+
+  // Cat list
+  const totalS = total||1;
+  document.getElementById('rpt-cat-list').innerHTML = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`
+    <div class="cat-row"><div class="cat-dot" style="background:${CAT_COLORS[cat]||'#64748b'}"></div>
+    <div class="cat-name">${cat}</div><div class="cat-amount">${fmt(amt)}</div><div class="cat-pct">${((amt/totalS)*100).toFixed(0)}%</div></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${(amt/totalS)*100}%;background:${CAT_COLORS[cat]||'#64748b'}"></div></div>
+  `).join('') || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No data</div>';
+
+  // Cards bar
+  const cardTotals = state.cards.map(c=>({name:c.name,color:c.color,total:charges.filter(t=>t.cardId===c.id).reduce((s,t)=>s+t.amount,0)})).filter(c=>c.total>0);
+  destroyChart('rptChartCards');
+  if (cardTotals.length) {
+    charts['rptChartCards'] = new Chart(document.getElementById('rpt-chart-cards'), {
+      type: 'bar',
+      data: { labels: cardTotals.map(c=>c.name), datasets: [{ data: cardTotals.map(c=>c.total), backgroundColor: cardTotals.map(c=>c.color), borderRadius:6, borderSkipped:false }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
+    });
+  }
+
+  // Txn list
+  const sorted = [...txns].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  document.getElementById('rpt-txn-list').innerHTML = sorted.map(t=>{
+    const card=state.cards.find(c=>c.id===t.cardId);
+    return `<tr>
+      <td>${formatDate(t.date)}</td><td>${t.description}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${card?card.color:'#64748b'};display:inline-block"></span>${card?card.name:'Unknown'}</span></td>
+      <td><span class="badge ${CAT_CLASS[t.category]||'badge-misc'}">${t.category}</span></td>
+      <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">No transactions in this period</td></tr>';
+}
+function buildTrendData(txns, start, end) {
+  const diff = (end - start) / (1000*60*60*24);
+  const labels = [], values = [];
+  if (diff <= 35) {
+    // Daily
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+      const ds = d.toISOString().slice(0,10);
+      labels.push(d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+      values.push(txns.filter(t=>t.date===ds&&t.amount>0).reduce((s,t)=>s+t.amount,0));
+    }
+  } else if (diff <= 95) {
+    // Weekly
+    let cur = new Date(start);
+    while (cur <= end) {
+      const wEnd = new Date(cur); wEnd.setDate(cur.getDate()+6);
+      labels.push('Wk '+cur.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+      values.push(txns.filter(t=>inRange(t.date,cur,wEnd)&&t.amount>0).reduce((s,t)=>s+t.amount,0));
+      cur.setDate(cur.getDate()+7);
+    }
+  } else {
+    // Monthly
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur <= end) {
+      const mEnd = new Date(cur.getFullYear(), cur.getMonth()+1, 0);
+      labels.push(cur.toLocaleString('default',{month:'short',year:'2-digit'}));
+      values.push(txns.filter(t=>inRange(t.date,cur,mEnd)&&t.amount>0).reduce((s,t)=>s+t.amount,0));
+      cur.setMonth(cur.getMonth()+1);
+    }
+  }
+  return { labels, values };
+}
+
+// ─── Export ───────────────────────────────────────────────
+function exportCSV() {
+  const { start, end } = getReportRange();
+  const cardF = document.getElementById('rpt-card').value;
+  let txns = state.transactions.filter(t=>inRange(t.date,start,end));
+  if (cardF) txns = txns.filter(t=>t.cardId===cardF);
+  const rows = [['Date','Description','Card','Category','Amount']];
+  txns.forEach(t=>{
+    const card = state.cards.find(c=>c.id===t.cardId);
+    rows.push([t.date, `"${t.description}"`, card?card.name:'Unknown', t.category, t.amount.toFixed(2)]);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `transactions-export.csv`;
+  a.click();
+  toast('CSV exported!');
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function populateCardDropdowns(selectId) {
+  const ids = selectId ? [selectId] : ['txn-card','edit-txn-card'];
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = state.cards.map(c=>`<option value="${c.id}">${c.name}${c.last4?' (••'+c.last4+')':''}</option>`).join('');
+  });
+  const txnCF = document.getElementById('txn-card-filter');
+  if (txnCF && !selectId) {
+    txnCF.innerHTML = '<option value="">All Cards</option>' + state.cards.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+// ─── Init ─────────────────────────────────────────────────
+populateCardDropdowns();
+renderDashboard();
+renderCards();
+</script>
+</body>
+</html>
