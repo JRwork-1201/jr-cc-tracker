@@ -797,7 +797,7 @@ function renderDashboard() {
 
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${charges.length} transactions</div></div>
-    <div class="stat-card"><div class="stat-label">Avg per Transaction</div><div class="stat-value">${charges.length ? fmt(total/charges.length) : '$0.00'}</div><div class="stat-sub">across all cards</div></div>
+    <div class="stat-card"><div class="stat-label">Avg per Transaction</div><div class="stat-value">${charges.length ? fmt(total/charges.length) : '₹0.00'}</div><div class="stat-sub">across all cards</div></div>
     <div class="stat-card"><div class="stat-label">Top Card</div><div class="stat-value" style="font-size:16px">${topCard ? topCard.name : '—'}</div><div class="stat-sub">${topCard ? fmt(byCard[topCard.id]) + ' spent' : 'No data'}</div></div>
   `;
 
@@ -837,7 +837,7 @@ function renderDashboard() {
     charts['chartCards'] = new Chart(document.getElementById('chart-cards'), {
       type: 'bar',
       data: { labels: cardNames, datasets: [{ data: cardTotals, backgroundColor: state.cards.map(c=>c.color), borderRadius: 6, borderSkipped: false }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color:'#64748b', font:{size:10} }, grid:{display:false} }, y: { ticks: { color:'#64748b', font:{size:11}, callback: v=>'$'+v.toFixed(0) }, grid:{ color:'rgba(255,255,255,0.05)' } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color:'#64748b', font:{size:10} }, grid:{display:false} }, y: { ticks: { color:'#64748b', font:{size:11}, callback: v=>'₹'+v.toFixed(0) }, grid:{ color:'rgba(255,255,255,0.05)' } } } }
     });
   }
 
@@ -1359,7 +1359,7 @@ function renderReports() {
   document.getElementById('rpt-stats').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Spend</div><div class="stat-value">${fmt(total)}</div><div class="stat-sub">${label}</div></div>
     <div class="stat-card"><div class="stat-label">Credits / Refunds</div><div class="stat-value" style="color:var(--green)">${fmt(credits)}</div><div class="stat-sub">${txns.filter(t=>t.amount<0).length} credits</div></div>
-    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value">${charges.length}</div><div class="stat-sub">avg ${charges.length?fmt(total/charges.length):'$0'}/txn</div></div>
+    <div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value">${charges.length}</div><div class="stat-sub">avg ${charges.length?fmt(total/charges.length):'₹0'}/txn</div></div>
   `;
 
   // Category chart
@@ -1382,7 +1382,7 @@ function renderReports() {
   charts['rptChartTrend'] = new Chart(document.getElementById('rpt-chart-trend'), {
     type: 'bar',
     data: { labels: trendData.labels, datasets: [{ data: trendData.values, backgroundColor: 'rgba(108,99,255,0.7)', borderRadius:4, borderSkipped:false }] },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'₹'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
   });
 
   // Cat list
@@ -1400,7 +1400,7 @@ function renderReports() {
     charts['rptChartCards'] = new Chart(document.getElementById('rpt-chart-cards'), {
       type: 'bar',
       data: { labels: cardTotals.map(c=>c.name), datasets: [{ data: cardTotals.map(c=>c.total), backgroundColor: cardTotals.map(c=>c.color), borderRadius:6, borderSkipped:false }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#64748b',font:{size:10}},grid:{display:false}}, y:{ticks:{color:'#64748b',font:{size:11},callback:v=>'₹'+v.toFixed(0)},grid:{color:'rgba(255,255,255,0.05)'}} } }
     });
   }
 
