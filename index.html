@@ -79,6 +79,21 @@
   .badge-business { background: rgba(168,85,247,0.15); color: #c084fc; }
   .badge-shopping { background: rgba(245,158,11,0.15); color: #fbbf24; }
   .badge-misc { background: rgba(100,116,139,0.15); color: #94a3b8; }
+  .badge-interest { background: rgba(239,68,68,0.15); color: #f87171; }
+  .badge-taxes { background: rgba(234,179,8,0.15); color: #facc15; }
+  .badge-insurance { background: rgba(20,184,166,0.15); color: #2dd4bf; }
+  .badge-emi { background: rgba(249,115,22,0.15); color: #fb923c; }
+  .badge-membership { background: rgba(236,72,153,0.15); color: #f472b6; }
+  .badge-health { background: rgba(16,185,129,0.15); color: #34d399; }
+  .badge-subscriptions { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+  .badge-membership { background: rgba(236,72,153,0.15); color: #f472b6; }
+  .badge-health { background: rgba(16,185,129,0.15); color: #34d399; }
+  /* Bulk action bar */
+  .bulk-bar { display:none; align-items:center; gap:10px; padding:10px 14px; background:rgba(108,99,255,0.12); border:1px solid rgba(108,99,255,0.3); border-radius:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .bulk-bar.visible { display:flex; }
+  .bulk-bar select { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:5px 8px; font-size:13px; }
+  input[type=checkbox] { accent-color:#6c63ff; width:15px; height:15px; cursor:pointer; }
+  tr.row-selected td { background:rgba(108,99,255,0.08); }
 
   /* Credit card widget */
   .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 28px; }
@@ -468,6 +483,13 @@
       <option>Travel & Transport</option>
       <option>Business & Work</option>
       <option>Shopping & Personal</option>
+      <option>Interest</option>
+      <option>Taxes</option>
+      <option>Insurance & Finance</option>
+      <option>EMI</option>
+      <option>Memberships</option>
+      <option>Health & Fitness</option>
+      <option>Subscriptions</option>
       <option>Misc</option>
     </select>
     <select class="filter-select" id="txn-period-filter" onchange="renderTransactions()">
@@ -479,9 +501,33 @@
     </select>
     <span class="ml-auto" style="font-size:12px;color:var(--muted)" id="txn-count"></span>
   </div>
+  <!-- Bulk action bar (shown when rows are selected) -->
+  <div class="bulk-bar" id="bulk-bar">
+    <span id="bulk-count" style="font-size:13px;font-weight:600;color:var(--accent)"></span>
+    <span style="font-size:13px;color:var(--muted)">Change category:</span>
+    <select id="bulk-cat-select">
+      <option value="">-- pick --</option>
+      <option>Food & Dining</option>
+      <option>Travel & Transport</option>
+      <option>Business & Work</option>
+      <option>Shopping & Personal</option>
+      <option>Interest</option>
+      <option>Taxes</option>
+      <option>Insurance & Finance</option>
+      <option>EMI</option>
+      <option>Memberships</option>
+      <option>Health & Fitness</option>
+      <option>Subscriptions</option>
+      <option>Misc</option>
+    </select>
+    <span style="font-size:13px;color:var(--muted)">Move to card:</span>
+    <select id="bulk-card-select"><option value="">-- keep --</option></select>
+    <button class="btn btn-primary btn-sm" onclick="applyBulkEdit()">Apply</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearBulkSelect()">Clear</button>
+  </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+      <thead><tr><th style="width:36px"><input type="checkbox" id="select-all-chk" onchange="toggleSelectAll(this.checked)" title="Select all"></th><th>Date</th><th>Description</th><th>Card</th><th>Category</th><th>Amount</th><th></th></tr></thead>
       <tbody id="txn-list"></tbody>
     </table>
   </div>
@@ -682,6 +728,13 @@
           <option>Travel & Transport</option>
           <option>Business & Work</option>
           <option>Shopping & Personal</option>
+          <option>Interest</option>
+          <option>Taxes</option>
+          <option>Insurance & Finance</option>
+          <option>EMI</option>
+          <option>Memberships</option>
+          <option>Health & Fitness</option>
+          <option>Subscriptions</option>
           <option>Misc</option>
         </select>
       </div>
@@ -728,6 +781,13 @@
           <option>Travel & Transport</option>
           <option>Business & Work</option>
           <option>Shopping & Personal</option>
+          <option>Interest</option>
+          <option>Taxes</option>
+          <option>Insurance & Finance</option>
+          <option>EMI</option>
+          <option>Memberships</option>
+          <option>Health & Fitness</option>
+          <option>Subscriptions</option>
           <option>Misc</option>
         </select>
       </div>
@@ -888,6 +948,13 @@ const CAT_COLORS = {
   'Travel & Transport': '#3b82f6',
   'Business & Work': '#8b5cf6',
   'Shopping & Personal': '#f59e0b',
+  'Interest': '#ef4444',
+  'Taxes': '#eab308',
+  'Insurance & Finance': '#14b8a6',
+  'EMI': '#f97316',
+  'Memberships': '#ec4899',
+  'Health & Fitness': '#10b981',
+  'Subscriptions': '#6366f1',
   'Misc': '#64748b'
 };
 const CAT_CLASS = {
@@ -895,6 +962,13 @@ const CAT_CLASS = {
   'Travel & Transport': 'badge-travel',
   'Business & Work': 'badge-business',
   'Shopping & Personal': 'badge-shopping',
+  'Interest': 'badge-interest',
+  'Taxes': 'badge-taxes',
+  'Insurance & Finance': 'badge-insurance',
+  'EMI': 'badge-emi',
+  'Memberships': 'badge-membership',
+  'Health & Fitness': 'badge-health',
+  'Subscriptions': 'badge-subscriptions',
   'Misc': 'badge-misc'
 };
 let selectedCardId = null;
@@ -1169,6 +1243,7 @@ function renderCardDetail() {
 }
 
 // ─── Transactions ──────────────────────────────────────────
+let selectedTxns = new Set();
 function renderTransactions() {
   const search = document.getElementById('txn-search').value.toLowerCase();
   const cardF = document.getElementById('txn-card-filter').value;
@@ -1186,7 +1261,9 @@ function renderTransactions() {
   document.getElementById('txn-count').textContent = txns.length + ' transactions';
   document.getElementById('txn-list').innerHTML = txns.map(t => {
     const card = state.cards.find(c=>c.id===t.cardId);
-    return `<tr>
+    const chk = selectedTxns.has(t.id) ? 'checked' : '';
+    return `<tr class="${selectedTxns.has(t.id)?'row-selected':''}">
+      <td><input type="checkbox" ${chk} onchange="toggleTxnSelect('${t.id}',this.checked)"></td>
       <td>${formatDate(t.date)}</td>
       <td>${t.description}${t.notes?`<span style="color:var(--muted);font-size:11px;margin-left:6px">${t.notes}</span>`:''}</td>
       <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${card?card.color:'#64748b'};display:inline-block"></span>${card?card.name:'Unknown'}</span></td>
@@ -1194,7 +1271,72 @@ function renderTransactions() {
       <td class="${t.amount>0?'amount-positive':'amount-negative'}">${fmtSigned(t.amount)}</td>
       <td><div class="row-actions"><button class="icon-btn" onclick="openEditTxn('${t.id}')">✏️</button><button class="icon-btn" onclick="deleteTxn('${t.id}')">🗑️</button></div></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px">No transactions found</td></tr>';
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px">No transactions found</td></tr>`;
+  updateBulkBar();
+}
+function toggleTxnSelect(id, checked) {
+  if (checked) selectedTxns.add(id); else selectedTxns.delete(id);
+  updateBulkBar();
+  // sync select-all checkbox
+  const allChk = document.getElementById('select-all-chk');
+  if (allChk) {
+    const visible = [...document.querySelectorAll('#txn-list input[type=checkbox]')];
+    allChk.checked = visible.length > 0 && visible.every(c=>c.checked);
+    allChk.indeterminate = visible.some(c=>c.checked) && !allChk.checked;
+  }
+}
+function toggleSelectAll(checked) {
+  document.querySelectorAll('#txn-list input[type=checkbox]').forEach(c=>{
+    c.checked = checked;
+    const id = c.closest('tr').querySelector('button')?.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+    // get id from checkbox onchange
+    const oc = c.getAttribute('onchange')||'';
+    const m = oc.match(/'([^']+)'/);
+    if (m) { if (checked) selectedTxns.add(m[1]); else selectedTxns.delete(m[1]); }
+  });
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const cnt = document.getElementById('bulk-count');
+  if (!bar) return;
+  if (selectedTxns.size > 0) {
+    bar.classList.add('visible');
+    cnt.textContent = selectedTxns.size + ' selected';
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+function clearBulkSelect() {
+  selectedTxns.clear();
+  document.querySelectorAll('#txn-list input[type=checkbox]').forEach(c=>c.checked=false);
+  const allChk = document.getElementById('select-all-chk');
+  if (allChk) { allChk.checked = false; allChk.indeterminate = false; }
+  updateBulkBar();
+}
+async function applyBulkEdit() {
+  if (!selectedTxns.size) return;
+  const newCat = document.getElementById('bulk-cat-select').value;
+  const newCard = document.getElementById('bulk-card-select').value;
+  if (!newCat && !newCard) { toast('Pick a category or card to apply', 'error'); return; }
+  const ids = [...selectedTxns];
+  for (const id of ids) {
+    const idx = state.transactions.findIndex(t=>t.id===id);
+    if (idx < 0) continue;
+    const updates = {};
+    if (newCat) { updates.category = newCat; state.transactions[idx].category = newCat; }
+    if (newCard) { updates.card_id = newCard; state.transactions[idx].cardId = newCard; }
+    if (!useLocal && Object.keys(updates).length) {
+      const { error } = await sb.from('transactions').update(updates).eq('id', id);
+      if (error) { useLocal = true; toast('Cloud sync unavailable — saved locally', 'warn'); }
+    }
+  }
+  if (useLocal) lsSave(LS.txns, state.transactions);
+  toast(`Updated ${ids.length} transaction${ids.length>1?'s':''}!`);
+  clearBulkSelect();
+  document.getElementById('bulk-cat-select').value = '';
+  document.getElementById('bulk-card-select').value = '';
+  renderTransactions();
 }
 function openAddTxn() {
   populateCardDropdowns();
@@ -1488,6 +1630,20 @@ function normalizeDate(str) {
 }
 function guessCat(hint) {
   const h = (hint||'').toLowerCase();
+  // Interest
+  if (/interest|finance charge|late payment|overdue|finance fee/.test(h)) return 'Interest';
+  // Taxes
+  if (/\bcgst\b|\bsgst\b|\bigst\b|\bgst\b|\btax\b|service tax|cess/.test(h)) return 'Taxes';
+  // EMI
+  if (/\bemi\b|flexipay|fp emi|easy pay|convert to emi|installment|instalment/.test(h)) return 'EMI';
+  // Memberships
+  if (/membership|annual fee|renewal fee|club fee|association|society fee|alumni|lounge access/.test(h)) return 'Memberships';
+  // Health & Fitness
+  if (/gym|cult\.fit|cult fit|crossfit|fitness|yoga|pilates|healthify|cure\.fit|gold's gym|anytime fitness|doctor|clinic|hospital|pharmacy|apollo|fortis|max hospital|medplus|1mg|netmeds|tata 1mg|dentist|physiotherapy|health/.test(h)) return 'Health & Fitness';
+  // Subscriptions
+  if (/netflix|prime video|hotstar|disney|spotify|apple music|youtube premium|zee5|sonyliv|jiocinema|mxplayer|voot|erosnow|discovery|paramount|hbo|subscription|monthly plan|annual plan|adobe|microsoft 365|office 365|icloud|google one|dropbox/.test(h)) return 'Subscriptions';
+  // Insurance & Finance
+  if (/insurance|lombard|bajaj allianz|hdfc ergo|tata aig|star health|new india|national insurance|united india|lic |life insurance|policy|premium|mutual fund|sip |investment|nifty|sensex|zerodha|groww|upstox|kuvera|coin by zerodha/.test(h)) return 'Insurance & Finance';
   // Food & Dining — Indian + international
   if (/zomato|swiggy|blinkit|zepto|bigbasket|dunzo|dineout|eazydiner|freshmenu|box8|faasos|licious|country delight|milkbasket|restaurant|cafe|coffee|dhaba|biryani|pizza|burger|sushi|mcdonald|kfc|subway|domino|haldiram|barbeque|wow momo|starbucks|chaayos|third wave|barista|ccd|costa|food|dining|grocery|supermarket|more retail|reliance fresh|d-mart|dmart|spencer|nature basket/.test(h)) return 'Food & Dining';
   // Travel & Transport — Indian + international
@@ -1708,7 +1864,14 @@ function populateCardDropdowns(selectId) {
   });
   const txnCF = document.getElementById('txn-card-filter');
   if (txnCF && !selectId) {
+    const prev = txnCF.value; // preserve current filter selection
     txnCF.innerHTML = '<option value="">All Cards</option>' + state.cards.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    if (prev) txnCF.value = prev; // restore after rebuild
+  }
+  // Also populate bulk-card-select if present
+  const bcs = document.getElementById('bulk-card-select');
+  if (bcs && !selectId) {
+    bcs.innerHTML = '<option value="">-- keep --</option>' + state.cards.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   }
 }
 
