@@ -1018,24 +1018,24 @@ function toast(msg, type = 'success') {
 function now() { return new Date(); }
 function startOf(period, ref = new Date()) {
   const d = new Date(ref);
-  if (period === 'month') return new Date(d.getFullYear(), d.getMonth(), 1);
+  if (period === 'month' || period === 'this_month') return new Date(d.getFullYear(), d.getMonth(), 1);
   if (period === 'last_month') return new Date(d.getFullYear(), d.getMonth() - 1, 1);
-  if (period === 'quarter') {
+  if (period === 'quarter' || period === 'this_quarter') {
     const q = Math.floor(d.getMonth() / 3);
     return new Date(d.getFullYear(), q * 3, 1);
   }
-  if (period === 'year') return new Date(d.getFullYear(), 0, 1);
+  if (period === 'year' || period === 'this_year') return new Date(d.getFullYear(), 0, 1);
   return new Date(0);
 }
 function endOf(period, ref = new Date()) {
   const d = new Date(ref);
-  if (period === 'month') return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  if (period === 'month' || period === 'this_month') return new Date(d.getFullYear(), d.getMonth() + 1, 0);
   if (period === 'last_month') return new Date(d.getFullYear(), d.getMonth(), 0);
-  if (period === 'quarter') {
+  if (period === 'quarter' || period === 'this_quarter') {
     const q = Math.floor(d.getMonth() / 3);
     return new Date(d.getFullYear(), q * 3 + 3, 0);
   }
-  if (period === 'year') return new Date(d.getFullYear(), 11, 31);
+  if (period === 'year' || period === 'this_year') return new Date(d.getFullYear(), 11, 31);
   return new Date();
 }
 function inRange(dateStr, start, end) {
